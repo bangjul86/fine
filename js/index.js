@@ -14,6 +14,7 @@
 	// Your pool array index, usually abbreviated as pid
 	globalThis.poolId = 0;
 	globalThis.tokenPerBlock = 0.0008; // Not in Wei, but in real number.
+	globalThis.usePancakeSwap = false; // false if you use 1inch
 
 	// Get these data from The Explorer
 	// Even if it is a long long text, just put it here and ignore.
@@ -90,6 +91,28 @@
 		let json = await response.json();
 
 		return json[id].usd;
+	}
+
+	globalThis.getTokenPrice = async function () {
+		if (usePancakeSwap) {
+			// Fetching data from pancake swap
+			let response = await fetch(`https://api.pancakeswap.info/api/v2/tokens/${tokenAddress}`);
+			let data = await response.json();
+
+			if (data.error) return alert(data.error.message);
+
+			// This already in USD
+			return (+web3.utils.fromWei(data.data.price)).toFixed(2);
+		} else {
+			// Fetching data from 1inch
+			let response = await fetch(`https://api.1inch.exchange/v3.0/56/quote?fromTokenAddress=${tokenAddress}&toTokenAddress=0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c&amount=10000000000000000`);
+			let data = await response.json();
+
+			if (data.error) return alert(data.message);
+
+			// Multiply to USD
+			return (+web3.utils.fromWei(data.toTokenAmount) * getCoingeckoPrice('binancecoin')).toFixed(2);
+		}
 	}
 
 	globalThis.toWei = function (num) {
@@ -254,18 +277,27 @@
 			let balance = await tokenContract.methods.balanceOf(sender).call(),
 			staked = (await stakingContract.methods.userInfo(poolId, sender).call()).amount,
 			earned = (await stakingContract.methods.pendingRewards(poolId, sender).call()),
+			pooled = (await stakingContract.methods.poolInfo(poolId).call()).depositedAmount,
+			price = await getTokenPrice(),
+			earnedTokenBalance = (await tokenContract.methods.balanceOf(sender).call()),
 			tokenName = await tokenContract.methods.symbol.call().call();
 
 			// Converting to precious digits
 			balance = (+web3.utils.fromWei(balance)).toFixed(2);
 			staked = (+web3.utils.fromWei(staked)).toFixed(2);
 			earned = (+web3.utils.fromWei(earned)).toFixed(2);
+			pooled = (+web3.utils.fromWei(pooled)).toFixed(2);
+			price = (+price).toFixed(2);
+			earnedTokenBalance = (+web3.utils.fromWei(earnedTokenBalance)).toFixed(2);
 
 			// Display them
 			document.getElementById('balance').innerText = `${balance} ${tokenName}`;
 			document.getElementById('staked').innerText = `${staked} ${tokenName}`;
 			document.getElementById('earned').innerText = `${earned} ${tokenNameToBeEarned}`;
+			document.getElementById('pooled').innerText = `${pooled} ${tokenName}`;
+			document.getElementById('price').innerText = `${price} USD`;
 			document.getElementById('tokenPerBlock').innerText = `${tokenPerBlock} ${tokenNameToBeEarned}`;
+			document.getElementById('tokenBalance').innerText = `${earnedTokenBalance} ${tokenNameToBeEarned}`;
 
 			stakeAmount.placeholder = `${balance} ${tokenName}`;
 			unstakeAmount.placeholder = `${staked} ${tokenName}`;
@@ -347,19 +379,28 @@
 			// Web3 Requests
 			let balance = await lpContract.methods.balanceOf(sender).call(),
 			staked = (await lmContract.methods.userInfo(sender).call()).amount,
-			earned = (await lmContract.methods.pendingRewards(sender).call());
+			earned = (await lmContract.methods.pendingRewards(sender).call()),
+			pooled = (await lpContract.methods.balanceOf(lmAddress).call()),
+			price = await getTokenPrice(),
+			earnedTokenBalance = (await tokenContract.methods.balanceOf(sender).call());
 
 			// Converting to precious digits
 			balance = (+web3.utils.fromWei(balance)).toFixed(2);
 			staked = (+web3.utils.fromWei(staked)).toFixed(2);
 			earned = (+web3.utils.fromWei(earned)).toFixed(2);
+			pooled = (+web3.utils.fromWei(pooled)).toFixed(2);
+			price = (+price).toFixed(2);
+			earnedTokenBalance = (+web3.utils.fromWei(earnedTokenBalance)).toFixed(2);
 			// totalStaked = (+web3.utils.fromWei(totalStaked)).toFixed(2);
 
 			// Display them
 			document.getElementById('balance').innerText = `${balance} ${lpTokenName}`;
 			document.getElementById('staked').innerText = `${staked} ${lpTokenName}`;
 			document.getElementById('earned').innerText = `${earned} ${tokenNameToBeEarned}`;
+			document.getElementById('pooled').innerText = `${pooled} ${lpTokenName}`;
+			document.getElementById('price').innerText = `${price} USD`;
 			document.getElementById('tokenPerBlock').innerText = `${tokenPerBlock} ${tokenNameToBeEarned}`;
+			document.getElementById('tokenBalance').innerText = `${earnedTokenBalance} ${tokenNameToBeEarned}`;
 
 			stakeAmount.placeholder = `${balance} ${lpTokenName}`;
 			unstakeAmount.placeholder = `${staked} ${lpTokenName}`;
