@@ -93,7 +93,12 @@
 		return json[id].usd;
 	}
 
+	globalThis.getLPTokenPrice = async function () {
+		let response = await fetch(`http://api.covalenthq.com/v1//address/${lpAddress}/balances_v2/`);
+	}
+
 	globalThis.getTokenPrice = async function () {
+		let tokenPrice = 0;
 		if (usePancakeSwap) {
 			// Fetching data from pancake swap
 			let response = await fetch(`https://api.pancakeswap.info/api/v2/tokens/${tokenAddress}`);
@@ -102,16 +107,25 @@
 			if (data.error) return alert(data.error.message);
 
 			// This already in USD
-			return (+web3.utils.fromWei(data.data.price)).toFixed(2);
+			tokenPrice = (+web3.utils.fromWei(data.data.price)).toFixed(2);
 		} else {
 			// Fetching data from 1inch
-			let response = await fetch(`https://api.1inch.exchange/v3.0/56/quote?fromTokenAddress=${tokenAddress}&toTokenAddress=0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c&amount=10000000000000000`);
+			let response = await fetch(`https://api.1inch.exchange/v3.0/56/quote?fromTokenAddress=${tokenAddress}&toTokenAddress=0xe9e7cea3dedca5984780bafc599bd69add087d56&amount=1000000000000000000`);
 			let data = await response.json();
 
 			if (data.error) return alert(data.message);
 
 			// Multiply to USD
-			return (+web3.utils.fromWei(data.toTokenAmount) * getCoingeckoPrice('binancecoin')).toFixed(2);
+			tokenPrice = (+web3.utils.fromWei(data.toTokenAmount)).toFixed(2);
+		}
+
+		if (stakingContract) {
+			return tokenPrice;
+		} else if (lpContract && lmContract) {
+			// TODO: calculate LP price (not by Hanz)
+			return tokenPrice;
+		} else {
+			alert("Configuration error", "Please check index.js");
 		}
 	}
 
