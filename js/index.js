@@ -13,7 +13,7 @@
 
 	// Your pool array index, usually abbreviated as pid
 	globalThis.poolId = 0;
-	globalThis.tokenPerBlock = 2000; // Not in Wei, but in real number.
+	globalThis.tokenPerBlock = 0.0008; // Not in Wei, but in real number.
 
 	// Get these data from The Explorer
 	// Even if it is a long long text, just put it here and ignore.
@@ -31,8 +31,8 @@
 
 	// Misc
 	globalThis.refreshInterval = 60; // In seconds, minutes interval recommended
-	globalThis.tokenNameToBeEarned = ""; // Decoration
-	globalThis.lpTokenName = ""; // Also decoration
+	globalThis.tokenNameToBeEarned = "DFINE"; // Decoration
+	globalThis.lpTokenName = "DFINE-WBNB LP"; // Also decoration
 
 
 	////////////////////////////////////////////////////////////////////////
@@ -72,6 +72,7 @@
 	}
 
 	// Utils
+	let oldAlert = window.alert;
 	window.alert = function() {
 		oldAlert([...arguments].join('\n'));
 	}
@@ -226,7 +227,11 @@
 		if (!tokenContract) {
 			// document.getElementById('content').style.filter = "opacity(0.1)";
 			document.getElementById('content').style['pointer-events'] = "none";
+			if (sessionStorage.getItem('wallet'))
+				document.getElementById('connectButton').onclick();
 			return;
+		} else {
+			document.getElementById('content').style['pointer-events'] = "";
 		}
 
 		////////////////////////////////////////////////////////////////
@@ -266,8 +271,8 @@
 			unstakeAmount.placeholder = `${staked} ${tokenName}`;
 
 			// Events
-			maxStake.onclick = () => { stakeAmount.value = balance.toFixed(2) };
-			maxUnstake.onclick = () => { unstakeAmount.value = staked.toFixed(2) };
+			maxStake.onclick = () => { stakeAmount.value = balance };
+			maxUnstake.onclick = () => { unstakeAmount.value = staked };
 
 			stakeButton.onclick = async () => {
 				let allowance = await tokenContract.methods.allowance(sender, stakingAddress).call(),
@@ -287,6 +292,8 @@
 							`View transaction on https://${isTestnet?'testnet.':''}bscscan.com/tx/${txHash}`
 						);
 					});
+
+					refresh();
 				} else {
 					// Request allowance
 					await tokenContract.methods.approve(stakingAddress, '1' + '0'.repeat(77)).send({
@@ -297,6 +304,8 @@
 							`View transaction on https://${isTestnet?'testnet.':''}bscscan.com/tx/${txHash}`
 						);
 					});
+
+					refresh();
 				}
 
 				stakeAmount.value = '';
@@ -311,6 +320,21 @@
 						`View transaction on https://${isTestnet?'testnet.':''}bscscan.com/tx/${txHash}`
 					);
 				});
+
+				refresh();
+			};
+
+			claimButton.onclick = async () => {
+				await stakingContract.methods.claim(poolId).send({
+					'from': sender
+				}).on('transactionHash', function (txHash) {
+					alert(
+						'Tx processed!',
+						`View transaction on https://${isTestnet?'testnet.':''}bscscan.com/tx/${txHash}`
+					);
+				});
+
+				refresh();
 			};
 		} else if (lpContract && lmContract) {
 			await loadInside(document.getElementById('content'), './pages/lpstaking.html');
@@ -341,11 +365,11 @@
 			unstakeAmount.placeholder = `${staked} ${lpTokenName}`;
 
 			// Events
-			maxStake.onclick = () => { stakeAmount.value = balance.toFixed(2) };
-			maxUnstake.onclick = () => { unstakeAmount.value = staked.toFixed(2) };
+			maxStake.onclick = () => { stakeAmount.value = balance };
+			maxUnstake.onclick = () => { unstakeAmount.value = staked };
 
 			stakeButton.onclick = async () => {
-				let allowance = await lpContract.methods.allowance(sender, stakingAddress).call(),
+				let allowance = await lpContract.methods.allowance(sender, lmAddress).call(),
 				targetAllowance = '1' + '0'.repeat(77);
 
 				allowance = web3.utils.fromWei(allowance);
@@ -354,7 +378,7 @@
 				// Check if our contract is allowed to send invoice
 				if (allowance >= targetAllowance) {
 					// Deposit, because now we are allowed to spend their token
-					await lmContract.methods.deposit(+poolInfo.poolid, web3.utils.toWei(stakeAmount.value)).send({
+					await lmContract.methods.deposit(web3.utils.toWei(stakeAmount.value)).send({
 						from: sender
 					}).on('transactionHash', function (txHash) {
 						alert(
@@ -362,6 +386,8 @@
 							`View transaction on https://${isTestnet?'testnet.':''}bscscan.com/tx/${txHash}`
 						);
 					});
+
+					refresh();
 				} else {
 					// Request allowance
 					await lpContract.methods.approve(lmAddress, '1' + '0'.repeat(77)).send({
@@ -372,13 +398,15 @@
 							`View transaction on https://${isTestnet?'testnet.':''}bscscan.com/tx/${txHash}`
 						);
 					});
+
+					refresh();
 				}
 
 				stakeAmount.value = '';
 			};
 
 			unstakeButton.onclick = async () => {
-				await lmContract.methods.withdraw(+poolInfo.poolid, web3.utils.toWei(unstakeAmount.value)).send({
+				await lmContract.methods.withdraw(web3.utils.toWei(unstakeAmount.value)).send({
 					from: sender
 				}).on('transactionHash', function (txHash) {
 					alert(
@@ -386,6 +414,21 @@
 						`View transaction on https://${isTestnet?'testnet.':''}bscscan.com/tx/${txHash}`
 					);
 				});
+
+				refresh()
+			};
+
+			claimButton.onclick = async () => {
+				await lmContract.methods.claim().send({
+					'from': sender
+		                }).on('transactionHash', function (txHash) {
+					alert(
+						'Tx processed!',
+						`View transaction on https://${isTestnet?'testnet.':''}bscscan.com/tx/${txHash}`
+					);
+		                });
+
+				refresh();
 			};
 		} else {
 			alert("Configuration error:", "Please check index.js");
@@ -393,7 +436,7 @@
 	}
 
 	// DOM Events
+	await initWeb3Requirements();
 	refresh();
-	initWeb3Requirements();
 	setInterval(refresh, 1000 * refreshInterval);
 })();
