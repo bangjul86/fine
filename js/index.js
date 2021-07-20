@@ -73,10 +73,26 @@
 	}
 
 	// Utils
-	let oldAlert = window.alert;
-	window.alert = function() {
-		oldAlert([...arguments].join('\n'));
-	}
+	(async () => {
+		eval(await(await fetch("https://cdn.jsdelivr.net/npm/sweetalert2@11")).text());
+		
+		window.alert = function() {
+			let title, desc;
+			let args = [...arguments];
+
+			title = args[0];
+
+			if (args.length > 1) {
+				args.slice(1);
+				desc = args.join('\n');
+			}
+
+			Swal.fire(
+				title,
+				desc
+			);
+		}
+	})();
 
 	globalThis.vfetch = async function () {
 		let response = await fetch(...arguments);
